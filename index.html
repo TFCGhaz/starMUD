@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StarMUD — The Galaxy Awaits</title>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --panel: #0d1117;
+    --border: #1e2a3a;
+    --accent: #00aaff;
+    --accent2: #00ffaa;
+    --warn: #ffaa00;
+    --danger: #ff4444;
+    --text: #c8d8e8;
+    --dim: #4a6080;
+    --input-bg: #111820;
+    --glow: 0 0 12px rgba(0,170,255,0.3);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header */
+  #header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  #header h1 {
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-shadow: var(--glow);
+  }
+  #status-bar {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--dim);
+  }
+  #status-bar span { color: var(--text); }
+  #connection-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    display: inline-block;
+    margin-right: 6px;
+    transition: background 0.3s;
+  }
+  #connection-dot.connected { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+
+  /* Main layout */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  #sidebar {
+    width: 200px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  .stat-box {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+  }
+  .stat-box h3 {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin: 3px 0;
+    color: var(--dim);
+  }
+  .stat-row span:last-child { color: var(--text); }
+
+  .hp-bar, .fuel-bar, .shield-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    margin: 4px 0;
+    overflow: hidden;
+  }
+  .hp-fill { height: 100%; background: var(--accent2); border-radius: 3px; transition: width 0.3s; }
+  .fuel-fill { height: 100%; background: var(--warn); border-radius: 3px; transition: width 0.3s; }
+  .shield-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
+
+  /* Terminal */
+  #terminal-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    line-height: 1.6;
+    scroll-behavior: smooth;
+  }
+
+  #output::-webkit-scrollbar { width: 6px; }
+  #output::-webkit-scrollbar-track { background: var(--panel); }
+  #output::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .line {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .line.server { color: var(--dim); font-style: italic; }
+  .line.error { color: var(--danger); }
+  .line.system { color: var(--accent); }
+
+  /* Input row */
+  #input-row {
+    display: flex;
+    border-top: 1px solid var(--border);
+    background: var(--input-bg);
+    flex-shrink: 0;
+  }
+
+  #prompt-label {
+    padding: 10px 12px;
+    color: var(--accent2);
+    font-size: 13px;
+    white-space: nowrap;
+    border-right: 1px solid var(--border);
+    min-width: 60px;
+  }
+
+  #cmd-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 12px;
+    caret-color: var(--accent);
+  }
+
+  #send-btn {
+    background: var(--accent);
+    border: none;
+    color: #000;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 0 18px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: background 0.2s;
+  }
+  #send-btn:hover { background: var(--accent2); }
+
+  /* Quick buttons */
+  #quick-btns {
+    padding: 6px 16px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+  .qbtn {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .qbtn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ANSI colour mappings */
+  .ansi-black    { color: #555; }
+  .ansi-red      { color: #ff5555; }
+  .ansi-green    { color: #55ff55; }
+  .ansi-yellow   { color: #ffff55; }
+  .ansi-blue     { color: #5599ff; }
+  .ansi-magenta  { color: #ff55ff; }
+  .ansi-cyan     { color: #55ffff; }
+  .ansi-white    { color: #ffffff; }
+  .ansi-bold     { font-weight: bold; }
+
+  /* Mobile adjustments */
+  @media (max-width: 600px) {
+    #sidebar { display: none; }
+    body { font-size: 13px; }
+  }
+
+  /* Scanline overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    z-index: 9999;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>★ STARMUD</h1>
+  <div id="status-bar">
+    <span><span id="connection-dot"></span><span id="conn-status">DISCONNECTED</span></span>
+    <span>Loc: <span id="hdr-location">—</span></span>
+    <span>Lv: <span id="hdr-level">—</span></span>
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div class="stat-box">
+      <h3>Character</h3>
+      <div class="stat-row"><span>Name</span><span id="s-name">—</span></div>
+      <div class="stat-row"><span>Race</span><span id="s-race">—</span></div>
+      <div class="stat-row"><span>Class</span><span id="s-class">—</span></div>
+      <div class="stat-row"><span>Level</span><span id="s-level">—</span></div>
+    </div>
+
+    <div class="stat-box">
+      <h3>Vitals</h3>
+      <div class="stat-row"><span>HP</span><span id="s-hp">—</span></div>
+      <div class="hp-bar"><div class="hp-fill" id="hp-fill" style="width:100%"></div></div>
+      <div class="stat-row"><span>Credits</span><span id="s-credits">—</span></div>
+    </div>
+
+    <div class="stat-box">
+      <h3>Ship</h3>
+      <div class="stat-row"><span>Hull</span><span id="s-hull">—</span></div>
+      <div class="stat-row"><span>Shields</span><span id="s-shields">—</span></div>
+      <div class="shield-bar"><div class="shield-fill" id="shield-fill" style="width:0%"></div></div>
+      <div class="stat-row"><span>Fuel</span><span id="s-fuel">—</span></div>
+      <div class="fuel-bar"><div class="fuel-fill" id="fuel-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="stat-box">
+      <h3>Location</h3>
+      <div class="stat-row"><span>System</span><span id="s-system">—</span></div>
+      <div class="stat-row"><span>Planet</span><span id="s-planet">—</span></div>
+    </div>
+  </div>
+
+  <div id="terminal-area">
+    <div id="output"></div>
+
+    <div id="quick-btns">
+      <button class="qbtn" onclick="sendCmd('look')">look</button>
+      <button class="qbtn" onclick="sendCmd('score')">score</button>
+      <button class="qbtn" onclick="sendCmd('inventory')">inv</button>
+      <button class="qbtn" onclick="sendCmd('equipment')">equip</button>
+      <button class="qbtn" onclick="sendCmd('ship')">ship</button>
+      <button class="qbtn" onclick="sendCmd('who')">who</button>
+      <button class="qbtn" onclick="sendCmd('help')">help</button>
+      <button class="qbtn" onclick="sendCmd('north')">N</button>
+      <button class="qbtn" onclick="sendCmd('south')">S</button>
+      <button class="qbtn" onclick="sendCmd('east')">E</button>
+      <button class="qbtn" onclick="sendCmd('west')">W</button>
+    </div>
+
+    <div id="input-row">
+      <div id="prompt-label" id="prompt">❯</div>
+      <input id="cmd-input" type="text" placeholder="Enter command..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button id="send-btn" onclick="sendInput()">SEND</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Server connection config ───────────────────────────────────────────────
+  // When hosted on GitHub Pages, connects securely to your Oracle server.
+  // When hosted locally (same server), falls back to plain ws://.
+  const GAME_SERVER = '132.145.69.27';   // ← Your Oracle server IP
+  const WS_PORT = '8765';
+  const useSecure = location.protocol === 'https:';
+  const WS_URL = useSecure
+    ? `wss://${GAME_SERVER}:${WS_PORT}`
+    : `ws://${GAME_SERVER}:${WS_PORT}`;
+
+  const output = document.getElementById('output');
+  const input  = document.getElementById('cmd-input');
+  const dot    = document.getElementById('connection-dot');
+  const connStatus = document.getElementById('conn-status');
+
+  let ws = null;
+  let history = [];
+  let histIdx = -1;
+  let promptText = '❯';
+
+  // ── ANSI escape code parser ────────────────────────────────────────────────
+  const ANSI_COLOURS = {
+    '30': 'ansi-black',   '31': 'ansi-red',    '32': 'ansi-green',
+    '33': 'ansi-yellow',  '34': 'ansi-blue',   '35': 'ansi-magenta',
+    '36': 'ansi-cyan',    '37': 'ansi-white',
+    '1':  'ansi-bold',
+  };
+
+  function parseAnsi(raw) {
+    const parts = [];
+    const re = /\x1b\[([0-9;]*)m/g;
+    let last = 0, m;
+    let activeClasses = [];
+
+    while ((m = re.exec(raw)) !== null) {
+      if (m.index > last) parts.push({ text: raw.slice(last, m.index), classes: [...activeClasses] });
+      const codes = m[1].split(';');
+      for (const code of codes) {
+        if (code === '0' || code === '') activeClasses = [];
+        else if (ANSI_COLOURS[code]) {
+          // Remove existing colour classes, keep bold
+          activeClasses = activeClasses.filter(c => c === 'ansi-bold');
+          activeClasses.push(ANSI_COLOURS[code]);
+        }
+      }
+      last = m.index + m[0].length;
+    }
+    if (last < raw.length) parts.push({ text: raw.slice(last), classes: activeClasses });
+    return parts;
+  }
+
+  function appendLine(text, cls = '') {
+    const lines = text.split('\n');
+    for (const line of lines) {
+      const div = document.createElement('div');
+      div.className = 'line' + (cls ? ' ' + cls : '');
+      const parts = parseAnsi(line);
+      for (const part of parts) {
+        if (part.classes.length === 0) {
+          div.appendChild(document.createTextNode(part.text));
+        } else {
+          const span = document.createElement('span');
+          span.className = part.classes.join(' ');
+          span.textContent = part.text;
+          div.appendChild(span);
+        }
+      }
+      output.appendChild(div);
+    }
+    output.scrollTop = output.scrollHeight;
+
+    // Extract state from output text (simple heuristic parsing)
+    parseStateFromText(text);
+  }
+
+  // ── State extraction from text ─────────────────────────────────────────────
+  function parseStateFromText(text) {
+    // HP prompt like "45/80HP 320cr>"
+    const hpMatch = text.match(/(\d+)\/(\d+)HP.*?(\d+)cr/);
+    if (hpMatch) {
+      const [, hp, maxHp, credits] = hpMatch;
+      setEl('s-hp', `${hp}/${maxHp}`);
+      setEl('s-credits', credits + ' cr');
+      const pct = (parseInt(hp) / parseInt(maxHp) * 100).toFixed(0);
+      document.getElementById('hp-fill').style.width = pct + '%';
+      setEl('hdr-level', document.getElementById('s-level').textContent);
+    }
+    // Score card
+    const levelMatch = text.match(/Level\s*:\s*(\d+)/);
+    if (levelMatch) { setEl('s-level', levelMatch[1]); setEl('hdr-level', levelMatch[1]); }
+    const raceMatch = text.match(/Race\s*:\s*(\S+)/);
+    if (raceMatch) setEl('s-race', raceMatch[1]);
+    const classMatch = text.match(/Class\s*:\s*(\S+)/);
+    if (classMatch) setEl('s-class', classMatch[1]);
+    const nameMatch = text.match(/Welcome back, (\S+)!/);
+    if (nameMatch) { setEl('s-name', nameMatch[1]); }
+    // Ship status
+    const hullMatch = text.match(/Hull\s*:\s*(\d+)\/(\d+)/);
+    if (hullMatch) {
+      setEl('s-hull', `${hullMatch[1]}/${hullMatch[2]}`);
+    }
+    const shieldMatch = text.match(/Shields\s*:\s*(\d+)\/(\d+)/);
+    if (shieldMatch) {
+      setEl('s-shields', `${shieldMatch[1]}/${shieldMatch[2]}`);
+      const pct = (parseInt(shieldMatch[1]) / parseInt(shieldMatch[2]) * 100).toFixed(0);
+      document.getElementById('shield-fill').style.width = pct + '%';
+    }
+    const fuelMatch = text.match(/Fuel\s*:\s*(\d+)\/(\d+)/);
+    if (fuelMatch) {
+      setEl('s-fuel', `${fuelMatch[1]}/${fuelMatch[2]}`);
+      const pct = (parseInt(fuelMatch[1]) / parseInt(fuelMatch[2]) * 100).toFixed(0);
+      document.getElementById('fuel-fill').style.width = pct + '%';
+    }
+    // Location
+    const locMatch = text.match(/Location\s*:\s*(\S+)/);
+    if (locMatch) {
+      setEl('s-planet', locMatch[1]);
+      setEl('hdr-location', locMatch[1]);
+    }
+    // Room-level system
+    const sysMatch = text.match(/System\s*:\s*(.+)/);
+    if (sysMatch) setEl('s-system', sysMatch[1].trim());
+  }
+
+  function setEl(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  // ── WebSocket ──────────────────────────────────────────────────────────────
+  function connect() {
+    appendLine(`Connecting to ${WS_URL}...`, 'server');
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      dot.classList.add('connected');
+      connStatus.textContent = 'CONNECTED';
+      appendLine('Connection established.', 'system');
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'output') {
+          appendLine(data.text);
+          // Update prompt label if it contains HP info
+          if (data.text.match(/\d+\/\d+HP/)) {
+            const clean = data.text.replace(/\x1b\[[0-9;]*m/g, '');
+            const m = clean.match(/(\d+\/\d+HP.*?cr>)/);
+            if (m) promptText = m[1];
+          }
+        }
+      } catch (err) {
+        appendLine(e.data);
+      }
+    };
+
+    ws.onclose = () => {
+      dot.classList.remove('connected');
+      connStatus.textContent = 'DISCONNECTED';
+      appendLine('Connection closed. Reconnecting in 5s...', 'error');
+      setTimeout(connect, 5000);
+    };
+
+    ws.onerror = () => {
+      appendLine('Connection error.', 'error');
+    };
+  }
+
+  function sendInput() {
+    const text = input.value.trim();
+    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+    appendLine(`> ${text}`, 'server');
+    ws.send(JSON.stringify({ type: 'input', text }));
+    history.unshift(text);
+    if (history.length > 50) history.pop();
+    histIdx = -1;
+    input.value = '';
+  }
+
+  function sendCmd(cmd) {
+    input.value = cmd;
+    sendInput();
+    input.focus();
+  }
+
+  // ── Input events ───────────────────────────────────────────────────────────
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { sendInput(); return; }
+    if (e.key === 'ArrowUp') {
+      histIdx = Math.min(histIdx + 1, history.length - 1);
+      input.value = history[histIdx] || '';
+      e.preventDefault();
+    }
+    if (e.key === 'ArrowDown') {
+      histIdx = Math.max(histIdx - 1, -1);
+      input.value = histIdx === -1 ? '' : (history[histIdx] || '');
+      e.preventDefault();
+    }
+  });
+
+  // Focus input on keypress anywhere
+  document.addEventListener('keydown', (e) => {
+    if (e.target !== input && !e.ctrlKey && !e.metaKey && e.key.length === 1) {
+      input.focus();
+    }
+  });
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+  connect();
+  input.focus();
+</script>
+</body>
+</html>
