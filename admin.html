@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StarMUD Admin</title>
+<style>
+  :root {
+    --bg: #080c12;
+    --panel: #0d1117;
+    --panel2: #111820;
+    --border: #1e2d40;
+    --accent: #00aaff;
+    --accent2: #00ffaa;
+    --warn: #ffaa00;
+    --danger: #ff4444;
+    --text: #c8d8e8;
+    --dim: #4a6080;
+    --green: #22c55e;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --gold: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; font-size: 13px; min-height: 100vh; }
+
+  /* ── Login ── */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; flex-direction: column; gap: 24px;
+  }
+  #login-screen h1 { color: var(--accent); font-size: 28px; letter-spacing: 6px; text-shadow: 0 0 20px rgba(0,170,255,0.5); }
+  #login-screen p { color: var(--dim); }
+  .login-box {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 32px; width: 320px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .login-box input {
+    background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); font-family: inherit; font-size: 14px;
+    padding: 10px 12px; border-radius: 4px; outline: none;
+  }
+  .login-box input:focus { border-color: var(--accent); }
+  #login-error { color: var(--danger); font-size: 12px; text-align: center; min-height: 16px; }
+
+  /* ── Dashboard ── */
+  #dashboard { display: none; }
+  #topbar {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 10px 20px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  #topbar h1 { color: var(--accent); font-size: 16px; letter-spacing: 4px; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  #server-status { display: flex; gap: 16px; font-size: 12px; }
+  .stat-chip { background: var(--panel2); border: 1px solid var(--border); padding: 4px 10px; border-radius: 12px; }
+  .stat-chip span { color: var(--accent2); }
+
+  /* ── Layout ── */
+  #content { padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 900px) { #content { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .card.full-width { grid-column: 1 / -1; }
+  .card-header {
+    background: var(--panel2); border-bottom: 1px solid var(--border);
+    padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-header h2 { font-size: 12px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; }
+  .card-body { padding: 16px; }
+
+  /* ── Players table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { color: var(--dim); text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); font-weight: normal; letter-spacing: 1px; text-transform: uppercase; }
+  td { padding: 8px; border-bottom: 1px solid rgba(30,45,64,0.5); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(0,170,255,0.04); }
+
+  .badge {
+    display: inline-block; padding: 2px 7px; border-radius: 10px;
+    font-size: 10px; font-weight: bold; letter-spacing: 0.5px;
+  }
+  .badge-online  { background: rgba(34,197,94,0.15);  color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+  .badge-offline { background: rgba(75,85,99,0.2);    color: var(--dim);   border: 1px solid var(--border); }
+  .badge-combat  { background: rgba(239,68,68,0.15);  color: var(--red);   border: 1px solid rgba(239,68,68,0.3); }
+  .badge-admin   { background: rgba(245,158,11,0.15); color: var(--gold);  border: 1px solid rgba(245,158,11,0.3); }
+  .badge-deity   { background: rgba(168,85,247,0.15); color: var(--purple);border: 1px solid rgba(168,85,247,0.3); }
+  .badge-immortal{ background: rgba(0,170,255,0.15);  color: var(--accent);border: 1px solid rgba(0,170,255,0.3); }
+
+  /* ── Forms ── */
+  .form-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+  .form-row label { color: var(--dim); font-size: 11px; min-width: 80px; }
+  select, input[type=text], input[type=number] {
+    background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); font-family: inherit; font-size: 12px;
+    padding: 6px 10px; border-radius: 4px; outline: none; flex: 1; min-width: 0;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+
+  /* ── Buttons ── */
+  .btn {
+    border: none; font-family: inherit; font-size: 12px; font-weight: bold;
+    padding: 7px 14px; border-radius: 4px; cursor: pointer; letter-spacing: 0.5px;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-primary  { background: var(--accent);  color: #000; }
+  .btn-primary:hover  { background: #33bbff; }
+  .btn-success  { background: var(--green);   color: #000; }
+  .btn-success:hover  { background: #4ade80; }
+  .btn-danger   { background: var(--red);     color: #fff; }
+  .btn-danger:hover   { background: #f87171; }
+  .btn-warn     { background: var(--warn);    color: #000; }
+  .btn-warn:hover     { background: #fbbf24; }
+  .btn-purple   { background: var(--purple);  color: #fff; }
+  .btn-purple:hover   { background: #c084fc; }
+  .btn-sm { padding: 4px 9px; font-size: 11px; }
+  .btn-outline {
+    background: transparent; border: 1px solid var(--border); color: var(--dim);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Log ── */
+  #log-output {
+    background: #060a0f; border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px; height: 220px; overflow-y: auto; font-size: 11px;
+    line-height: 1.7; color: var(--dim);
+  }
+  #log-output .log-info  { color: #4a90d9; }
+  #log-output .log-warn  { color: var(--warn); }
+  #log-output .log-error { color: var(--danger); }
+
+  /* ── Alerts ── */
+  #alert-bar {
+    position: fixed; bottom: 20px; right: 20px; z-index: 999;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .alert {
+    padding: 10px 16px; border-radius: 6px; font-size: 12px;
+    animation: slideIn 0.2s ease; max-width: 300px;
+  }
+  .alert-ok  { background: rgba(34,197,94,0.9);  color: #000; }
+  .alert-err { background: rgba(239,68,68,0.9);  color: #fff; }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* ── Room browser ── */
+  #room-filter { width: 100%; margin-bottom: 10px; }
+  #room-list { max-height: 240px; overflow-y: auto; }
+  .room-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 8px; border-bottom: 1px solid rgba(30,45,64,0.4);
+    font-size: 12px;
+  }
+  .room-row:hover { background: rgba(0,170,255,0.04); }
+  .room-name { color: var(--text); flex: 1; }
+  .room-meta { color: var(--dim); font-size: 11px; margin: 0 8px; }
+</style>
+</head>
+<body>
+
+<!-- ── Login ───────────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <h1>★ STARMUD</h1>
+  <p>Administrator Console</p>
+  <div class="login-box">
+    <input type="text"     id="login-user" placeholder="Username" value="admin">
+    <input type="password" id="login-pass" placeholder="Password">
+    <div id="login-error"></div>
+    <button class="btn btn-primary" onclick="doLogin()">LOGIN</button>
+  </div>
+</div>
+
+<!-- ── Dashboard ───────────────────────────────────────────────────────────── -->
+<div id="dashboard">
+  <div id="topbar">
+    <h1>★ STARMUD ADMIN</h1>
+    <div class="topbar-right">
+      <div id="server-status">
+        <div class="stat-chip">Players: <span id="stat-players">0</span></div>
+        <div class="stat-chip">Tick: <span id="stat-tick">0</span></div>
+        <div class="stat-chip">Uptime: <span id="stat-uptime">0s</span></div>
+        <div class="stat-chip">NPCs: <span id="stat-npcs">0</span></div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="doLogout()">LOGOUT</button>
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- Online Players -->
+    <div class="card full-width">
+      <div class="card-header">
+        <h2>Online Players</h2>
+        <button class="btn btn-outline btn-sm" onclick="refreshStatus()">↻ Refresh</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Race</th><th>Class</th><th>Level</th>
+              <th>HP</th><th>Credits</th><th>Location</th><th>Status</th><th>Rank</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="online-players-body">
+            <tr><td colspan="10" style="color:var(--dim);text-align:center;padding:20px">No players online</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Broadcast -->
+    <div class="card">
+      <div class="card-header"><h2>Broadcast Message</h2></div>
+      <div class="card-body">
+        <div class="form-row">
+          <input type="text" id="broadcast-msg" placeholder="Message to all players...">
+          <button class="btn btn-warn" onclick="doBroadcast()">SEND</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Give Credits / Item -->
+    <div class="card">
+      <div class="card-header"><h2>Give to Player</h2></div>
+      <div class="card-body">
+        <div class="form-row">
+          <label>Player</label>
+          <select id="give-player"></select>
+        </div>
+        <div class="form-row">
+          <label>Type</label>
+          <select id="give-type" onchange="toggleGiveType()">
+            <option value="credits">Credits</option>
+            <option value="item">Item</option>
+          </select>
+        </div>
+        <div id="give-credits-row" class="form-row">
+          <label>Amount</label>
+          <input type="number" id="give-amount" value="1000" min="1">
+        </div>
+        <div id="give-item-row" class="form-row" style="display:none">
+          <label>Item</label>
+          <select id="give-item-id"></select>
+        </div>
+        <button class="btn btn-success" onclick="doGive()">GIVE</button>
+      </div>
+    </div>
+
+    <!-- Spawn -->
+    <div class="card">
+      <div class="card-header"><h2>Spawn NPC / Item</h2></div>
+      <div class="card-body">
+        <div class="form-row">
+          <label>Type</label>
+          <select id="spawn-type">
+            <option value="npc">NPC</option>
+            <option value="item">Item</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Template</label>
+          <select id="spawn-template"></select>
+        </div>
+        <div class="form-row">
+          <label>Room</label>
+          <select id="spawn-room"></select>
+        </div>
+        <button class="btn btn-primary" onclick="doSpawn()">SPAWN</button>
+      </div>
+    </div>
+
+    <!-- Promote -->
+    <div class="card">
+      <div class="card-header"><h2>Promote / Demote Player</h2></div>
+      <div class="card-body">
+        <p style="color:var(--dim);font-size:11px;margin-bottom:12px">
+          Ranks: <span style="color:var(--text)">none</span> → 
+          <span style="color:var(--accent)">immortal</span> (unkillable, sees hidden info) → 
+          <span style="color:var(--purple)">deity</span> (world edit in-game) → 
+          <span style="color:var(--gold)">admin</span> (full access)
+        </p>
+        <div class="form-row">
+          <label>Player</label>
+          <input type="text" id="promote-name" placeholder="Character name">
+        </div>
+        <div class="form-row">
+          <label>Rank</label>
+          <select id="promote-rank">
+            <option value="none">None (mortal)</option>
+            <option value="immortal">Immortal</option>
+            <option value="deity">Deity</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button class="btn btn-purple" onclick="doPromote()">APPLY RANK</button>
+      </div>
+    </div>
+
+    <!-- All Players -->
+    <div class="card full-width">
+      <div class="card-header">
+        <h2>All Characters</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadAllPlayers()">↻ Refresh</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Race</th><th>Class</th><th>Level</th><th>Credits</th><th>Rank</th><th>Last Seen</th><th>Status</th></tr>
+          </thead>
+          <tbody id="all-players-body">
+            <tr><td colspan="8" style="color:var(--dim);text-align:center;padding:20px">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Server Log -->
+    <div class="card full-width">
+      <div class="card-header">
+        <h2>Server Log</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadLogs()">↻ Refresh</button>
+      </div>
+      <div class="card-body">
+        <div id="log-output">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="alert-bar"></div>
+
+<script>
+  // ── Config ─────────────────────────────────────────────────────────────────
+  const API = 'https://star-mud.duckdns.org/admin-api';
+  let TOKEN = '';
+  let worldData = {};
+
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  async function doLogin() {
+    const user = document.getElementById('login-user').value;
+    const pass = document.getElementById('login-pass').value;
+    const err  = document.getElementById('login-error');
+    err.textContent = '';
+    try {
+      const r = await api('/login', 'POST', { username: user, password: pass }, false);
+      TOKEN = r.token;
+      localStorage.setItem('admin_token', TOKEN);
+      showDashboard();
+    } catch (e) {
+      err.textContent = 'Invalid credentials.';
+    }
+  }
+
+  async function doLogout() {
+    await api('/logout', 'POST', {}).catch(() => {});
+    TOKEN = '';
+    localStorage.removeItem('admin_token');
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+
+  document.getElementById('login-pass').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  // ── API helper ─────────────────────────────────────────────────────────────
+  async function api(path, method = 'GET', body = null, auth = true) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+    };
+    if (auth) opts.headers['X-Admin-Token'] = TOKEN;
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(API + path, opts);
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({ error: r.statusText }));
+      throw new Error(e.error || r.statusText);
+    }
+    return r.json();
+  }
+
+  // ── Dashboard init ─────────────────────────────────────────────────────────
+  async function showDashboard() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    await loadWorldData();
+    await refreshStatus();
+    await loadAllPlayers();
+    await loadLogs();
+    setInterval(refreshStatus, 5000);
+    setInterval(loadLogs, 15000);
+  }
+
+  async function loadWorldData() {
+    try {
+      worldData = await api('/world');
+      populateSpawnDropdowns();
+      populateItemDropdown();
+    } catch (e) { console.error('World data error:', e); }
+  }
+
+  function populateSpawnDropdowns() {
+    const typeEl = document.getElementById('spawn-type');
+    const templateEl = document.getElementById('spawn-template');
+    const roomEl = document.getElementById('spawn-room');
+
+    function updateTemplates() {
+      templateEl.innerHTML = '';
+      const source = typeEl.value === 'npc' ? worldData.npcs : worldData.items;
+      for (const [id, info] of Object.entries(source || {})) {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = `${info.name}${info.level ? ` (Lv.${info.level})` : ''}`;
+        templateEl.appendChild(opt);
+      }
+    }
+    typeEl.addEventListener('change', updateTemplates);
+    updateTemplates();
+
+    roomEl.innerHTML = '';
+    for (const [id, info] of Object.entries(worldData.rooms || {})) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = `${info.name} [${info.planet || '?'}]`;
+      roomEl.appendChild(opt);
+    }
+  }
+
+  function populateItemDropdown() {
+    const el = document.getElementById('give-item-id');
+    el.innerHTML = '';
+    for (const [id, info] of Object.entries(worldData.items || {})) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = info.name;
+      el.appendChild(opt);
+    }
+  }
+
+  // ── Status refresh ─────────────────────────────────────────────────────────
+  async function refreshStatus() {
+    try {
+      const data = await api('/status');
+      document.getElementById('stat-players').textContent = data.player_count;
+      document.getElementById('stat-tick').textContent    = data.tick;
+      document.getElementById('stat-npcs').textContent    = data.total_npcs_alive;
+      document.getElementById('stat-uptime').textContent  = formatUptime(data.uptime);
+      renderOnlinePlayers(data.players);
+      updateGivePlayerDropdown(data.players);
+    } catch (e) { console.error('Status error:', e); }
+  }
+
+  function renderOnlinePlayers(players) {
+    const tbody = document.getElementById('online-players-body');
+    if (!players.length) {
+      tbody.innerHTML = '<tr><td colspan="10" style="color:var(--dim);text-align:center;padding:20px">No players online</td></tr>';
+      return;
+    }
+    tbody.innerHTML = players.map(p => {
+      const hpPct = Math.round(p.hp / p.max_hp * 100);
+      const hpColor = hpPct > 60 ? 'var(--green)' : hpPct > 30 ? 'var(--warn)' : 'var(--red)';
+      const rank = p.deity ? '<span class="badge badge-deity">DEITY</span>'
+                 : p.immortal ? '<span class="badge badge-immortal">IMMORTAL</span>'
+                 : p.admin ? '<span class="badge badge-admin">ADMIN</span>' : '—';
+      const status = p.in_combat ? '<span class="badge badge-combat">COMBAT</span>'
+                   : '<span class="badge badge-online">ONLINE</span>';
+      return `<tr>
+        <td><strong>${p.name}</strong></td>
+        <td>${capitalize(p.race)}</td>
+        <td>${capitalize(p.char_class)}</td>
+        <td>${p.level}</td>
+        <td style="color:${hpColor}">${p.hp}/${p.max_hp}</td>
+        <td>${p.credits.toLocaleString()} cr</td>
+        <td style="font-size:11px;color:var(--dim)">${p.planet}</td>
+        <td>${status}</td>
+        <td>${rank}</td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="kickPlayer('${p.name}')">Kick</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  function updateGivePlayerDropdown(players) {
+    const el = document.getElementById('give-player');
+    const cur = el.value;
+    el.innerHTML = players.map(p =>
+      `<option value="${p.name}">${p.name}</option>`
+    ).join('') || '<option value="">No players online</option>';
+    if (cur) el.value = cur;
+  }
+
+  // ── All players ────────────────────────────────────────────────────────────
+  async function loadAllPlayers() {
+    try {
+      const data = await api('/players');
+      const tbody = document.getElementById('all-players-body');
+      if (!data.players.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--dim);text-align:center;padding:20px">No saved characters</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.players.map(p => {
+        const rank = p.deity ? '<span class="badge badge-deity">DEITY</span>'
+                   : p.immortal ? '<span class="badge badge-immortal">IMMORTAL</span>'
+                   : p.admin ? '<span class="badge badge-admin">ADMIN</span>' : '—';
+        const status = p.online
+          ? '<span class="badge badge-online">ONLINE</span>'
+          : '<span class="badge badge-offline">OFFLINE</span>';
+        const last = p.last_login ? new Date(p.last_login * 1000).toLocaleDateString() : '—';
+        return `<tr>
+          <td><strong>${p.name}</strong></td>
+          <td>${capitalize(p.race || '')}</td>
+          <td>${capitalize(p.char_class || '')}</td>
+          <td>${p.level}</td>
+          <td>${(p.credits||0).toLocaleString()} cr</td>
+          <td>${rank}</td>
+          <td style="color:var(--dim);font-size:11px">${last}</td>
+          <td>${status}</td>
+        </tr>`;
+      }).join('');
+    } catch (e) { console.error('Players error:', e); }
+  }
+
+  // ── Logs ───────────────────────────────────────────────────────────────────
+  async function loadLogs() {
+    try {
+      const data = await api('/logs');
+      const el = document.getElementById('log-output');
+      el.innerHTML = data.logs.slice().reverse().map(line => {
+        const cls = line.includes('[ERROR]') ? 'log-error'
+                  : line.includes('[WARNING]') ? 'log-warn' : 'log-info';
+        return `<div class="${cls}">${escHtml(line)}</div>`;
+      }).join('');
+    } catch (e) { console.error('Logs error:', e); }
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  async function doBroadcast() {
+    const msg = document.getElementById('broadcast-msg').value.trim();
+    if (!msg) return;
+    try {
+      const r = await api('/broadcast', 'POST', { message: msg });
+      alert_ok(`Broadcast sent to ${r.sent_to} player(s).`);
+      document.getElementById('broadcast-msg').value = '';
+    } catch (e) { alert_err(e.message); }
+  }
+
+  function toggleGiveType() {
+    const t = document.getElementById('give-type').value;
+    document.getElementById('give-credits-row').style.display = t === 'credits' ? 'flex' : 'none';
+    document.getElementById('give-item-row').style.display    = t === 'item'    ? 'flex' : 'none';
+  }
+
+  async function doGive() {
+    const name = document.getElementById('give-player').value;
+    const type = document.getElementById('give-type').value;
+    if (!name) return alert_err('No player selected.');
+    try {
+      let body = { name, type };
+      if (type === 'credits') body.amount = parseInt(document.getElementById('give-amount').value);
+      else body.item_id = document.getElementById('give-item-id').value;
+      const r = await api('/give', 'POST', body);
+      alert_ok(`Gave ${r.gave} to ${r.to}.`);
+    } catch (e) { alert_err(e.message); }
+  }
+
+  async function doSpawn() {
+    const type        = document.getElementById('spawn-type').value;
+    const template_id = document.getElementById('spawn-template').value;
+    const room_id     = document.getElementById('spawn-room').value;
+    try {
+      const r = await api('/spawn', 'POST', { type, template_id, room_id });
+      alert_ok(`Spawned ${r.spawned} in ${r.room}.`);
+    } catch (e) { alert_err(e.message); }
+  }
+
+  async function doPromote() {
+    const name = document.getElementById('promote-name').value.trim();
+    const rank = document.getElementById('promote-rank').value;
+    if (!name) return alert_err('Enter a character name.');
+    try {
+      const r = await api('/promote', 'POST', { name, rank });
+      alert_ok(`${r.name} is now rank: ${rank}.`);
+      await loadAllPlayers();
+    } catch (e) { alert_err(e.message); }
+  }
+
+  async function kickPlayer(name) {
+    if (!confirm(`Kick ${name}?`)) return;
+    try {
+      await api('/kick', 'POST', { name });
+      alert_ok(`${name} has been kicked.`);
+      await refreshStatus();
+    } catch (e) { alert_err(e.message); }
+  }
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function formatUptime(s) {
+    if (s < 60) return `${s}s`;
+    if (s < 3600) return `${Math.floor(s/60)}m`;
+    return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+  }
+
+  function alert_ok(msg) { showAlert(msg, 'alert-ok'); }
+  function alert_err(msg) { showAlert(msg, 'alert-err'); }
+  function showAlert(msg, cls) {
+    const bar = document.getElementById('alert-bar');
+    const div = document.createElement('div');
+    div.className = `alert ${cls}`;
+    div.textContent = msg;
+    bar.appendChild(div);
+    setTimeout(() => div.remove(), 4000);
+  }
+
+  // ── Auto-login if token saved ──────────────────────────────────────────────
+  const saved = localStorage.getItem('admin_token');
+  if (saved) {
+    TOKEN = saved;
+    api('/status').then(() => showDashboard()).catch(() => {
+      TOKEN = '';
+      localStorage.removeItem('admin_token');
+    });
+  }
+</script>
+</body>
+</html>
