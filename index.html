@@ -324,7 +324,7 @@
   // When hosted on GitHub Pages, connects securely to your Oracle server.
   // When hosted locally (same server), falls back to plain ws://.
   const GAME_SERVER = 'star-mud.duckdns.org';
-  const WS_PORT = '8766';
+  const WS_PORT = '446';
   const useSecure = location.protocol === 'https:';
   const WS_URL = useSecure
     ? `wss://${GAME_SERVER}:${WS_PORT}`
