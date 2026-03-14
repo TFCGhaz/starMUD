@@ -222,6 +222,54 @@
       </div>
     </div>
 
+    <!-- Restore -->
+    <div class="card">
+      <div class="card-header"><h2>Restore Player(s)</h2></div>
+      <div class="card-body">
+        <p style="color:var(--dim);font-size:11px;margin-bottom:10px">Restore HP and Energy to full.</p>
+        <div class="form-row">
+          <button class="btn btn-success" onclick="doRestoreAll()" style="flex:1">RESTORE ALL</button>
+        </div>
+        <div class="form-row">
+          <select id="restore-player"></select>
+          <button class="btn btn-success" onclick="doRestoreOne()">RESTORE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tell / Private Message -->
+    <div class="card">
+      <div class="card-header"><h2>Private Message</h2></div>
+      <div class="card-body">
+        <div class="form-row">
+          <label>To</label>
+          <select id="tell-player">
+            <option value="all">All Players</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <input type="text" id="tell-msg" placeholder="Private message...">
+          <button class="btn btn-purple" onclick="doTell()">SEND</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cast Buff -->
+    <div class="card">
+      <div class="card-header"><h2>Cast Buff on Player</h2></div>
+      <div class="card-body">
+        <div class="form-row">
+          <label>Player</label>
+          <select id="buff-player"></select>
+        </div>
+        <div class="form-row">
+          <label>Ability</label>
+          <select id="buff-ability"></select>
+        </div>
+        <button class="btn btn-purple" onclick="doCastBuff()">CAST</button>
+      </div>
+    </div>
+
     <!-- Give Credits / Item -->
     <div class="card">
       <div class="card-header"><h2>Give to Player</h2></div>
@@ -388,6 +436,7 @@
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     await loadWorldData();
+    populateBuffAbilityDropdown();
     await refreshStatus();
     await loadAllPlayers();
     await loadLogs();
@@ -427,6 +476,25 @@
       opt.value = id;
       opt.textContent = `${info.name} [${info.planet || '?'}]`;
       roomEl.appendChild(opt);
+    }
+  }
+
+  function populateBuffAbilityDropdown() {
+    const el = document.getElementById('buff-ability');
+    el.innerHTML = '';
+    // Hardcode known ability ids since we don't have a dedicated endpoint
+    const abilities = [
+      'mind_blast','neural_disrupt','mind_shield','psi_drain','precognition',
+      'overcharge','deploy_turret','shield_boost','emp_blast','nanite_swarm',
+      'assault','fortify','grenade','battle_cry','execution',
+      'heal','stim_inject','toxin_dart','adrenaline_surge',
+      'quick_draw','smokescreen'
+    ];
+    for (const ab of abilities) {
+      const opt = document.createElement('option');
+      opt.value = ab;
+      opt.textContent = ab.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      el.appendChild(opt);
     }
   }
 
@@ -486,12 +554,18 @@
   }
 
   function updateGivePlayerDropdown(players) {
-    const el = document.getElementById('give-player');
-    const cur = el.value;
-    el.innerHTML = players.map(p =>
-      `<option value="${p.name}">${p.name}</option>`
-    ).join('') || '<option value="">No players online</option>';
-    if (cur) el.value = cur;
+    const playerOpts = players.map(p => `<option value="${p.name}">${p.name}</option>`).join('') || '<option value="">No players online</option>';
+    const cur_give = document.getElementById('give-player').value;
+    document.getElementById('give-player').innerHTML = playerOpts;
+    if (cur_give) document.getElementById('give-player').value = cur_give;
+
+    // Also update restore, tell, buff dropdowns
+    document.getElementById('restore-player').innerHTML = playerOpts;
+    document.getElementById('buff-player').innerHTML = playerOpts;
+    const tellEl = document.getElementById('tell-player');
+    const cur_tell = tellEl.value;
+    tellEl.innerHTML = '<option value="all">All Players</option>' + playerOpts;
+    if (cur_tell) tellEl.value = cur_tell;
   }
 
   // ── All players ────────────────────────────────────────────────────────────
@@ -539,6 +613,44 @@
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
+  async function doRestoreAll() {
+    if (!confirm('Restore ALL online players to full HP/Energy?')) return;
+    try {
+      const r = await api('/restore', 'POST', { target: 'all' });
+      alert_ok(`Restored ${r.restored} player(s).`);
+    } catch (e) { alert_err(e.message); }
+  }
+
+  async function doRestoreOne() {
+    const name = document.getElementById('restore-player').value;
+    if (!name) return alert_err('No player selected.');
+    try {
+      const r = await api('/restore', 'POST', { target: name });
+      alert_ok(`${r.restored} restored.`);
+    } catch (e) { alert_err(e.message); }
+  }
+
+  async function doTell() {
+    const target = document.getElementById('tell-player').value;
+    const msg = document.getElementById('tell-msg').value.trim();
+    if (!msg) return;
+    try {
+      const r = await api('/tell', 'POST', { target, message: msg });
+      alert_ok(`Sent to ${r.sent_to}.`);
+      document.getElementById('tell-msg').value = '';
+    } catch (e) { alert_err(e.message); }
+  }
+
+  async function doCastBuff() {
+    const target = document.getElementById('buff-player').value;
+    const ability_id = document.getElementById('buff-ability').value;
+    if (!target || !ability_id) return alert_err('Select player and ability.');
+    try {
+      const r = await api('/cast_buff', 'POST', { target, ability_id });
+      alert_ok(`Cast ${r.cast} on ${r.on}.`);
+    } catch (e) { alert_err(e.message); }
+  }
+
   async function doBroadcast() {
     const msg = document.getElementById('broadcast-msg').value.trim();
     if (!msg) return;
